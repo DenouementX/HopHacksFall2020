@@ -1,0 +1,1 @@
+ssh -i path\to\cred.pem user@ip
