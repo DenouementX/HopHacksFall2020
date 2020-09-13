@@ -11,7 +11,8 @@ from Globals import global_vars
 
 if __name__ == '__main__':
     time.sleep(1)
-
+    
+    # This path is outside the repo, one directory above, and down to auth again. This is on purpose. 
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("../../auth/Ten Thirty Tech Team-a8b956ad1156.json")
 
     if global_vars.do_react:
