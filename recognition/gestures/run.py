@@ -1,6 +1,7 @@
 import cv2
 from src.hand_tracker import HandTracker
 import math
+import zmq
 
 WINDOW = "Hand Tracking"
 PALM_MODEL_PATH = "palm_detection_without_custom_op.tflite"
@@ -11,8 +12,15 @@ POINT_COLOR = (0, 255, 0)
 CONNECTION_COLOR = (255, 0, 0)
 THICKNESS = 2
 
+context = zmq.Context()
+socket = context.socket(zmq.PUB)
+socket.bind("tcp://127.0.0.1:6007")
+
 cv2.namedWindow(WINDOW)
-capture = cv2.VideoCapture(0)
+capture = cv2.VideoCapture(1)
+
+capture.set(3, 640)
+capture.set(4, 480)
 
 if capture.isOpened():
     hasFrame, frame = capture.read()
@@ -55,6 +63,8 @@ def get_euclidean_distance(ax, ay, bx, by):
 def isThumbNearFirstFinger(p1, p2):
     distance = get_euclidean_distance(p1[0], p1[1], p2[0], p2[1])
     return distance < 0.1
+    
+
 
 while hasFrame:
 
@@ -120,10 +130,11 @@ while hasFrame:
         elif thumbIsOpen and firstFingerIsOpen and not secondFingerIsOpen and not thirdFingerIsOpen and fourthFingerIsOpen:
             gesture = "SPIDERMAN"
         elif not thumbIsOpen and not firstFingerIsOpen and not secondFingerIsOpen and not thirdFingerIsOpen and not fourthFingerIsOpen:
-            gesture =  "FIST"        
-
+            gesture =  "FIST"
+        elif thumbIsOpen and firstFingerIsOpen and secondFingerIsOpen and thirdFingerIsOpen and fourthFingerIsOpen:
+            gesture =  "THUMBS UP"
         print(gesture)
-
+        socket.send_string('0' + gesture)
     cv2.imshow(WINDOW, frame)
     hasFrame, frame = capture.read()
     key = cv2.waitKey(1)

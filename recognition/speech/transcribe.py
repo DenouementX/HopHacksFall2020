@@ -1,4 +1,3 @@
-
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,23 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Google Cloud Speech API sample application using the streaming API.
-NOTE: This module requires the dependencies `pyaudio` and `termcolor`.
-To install using pip:
-    pip install pyaudio
-    pip install termcolor
-Example usage:
-    python transcribe_streaming_infinite.py
-"""
-
-# [START speech_transcribe_infinite_streaming]
-
 import re
 import sys
 import time
 
-from google.cloud import speech
 import pyaudio
+import zmq
+from google.cloud import speech
 from six.moves import queue
 
 # Audio recording parameters
@@ -41,6 +30,7 @@ RED = '\033[0;31m'
 GREEN = '\033[0;32m'
 YELLOW = '\033[0;33m'
 
+stop_thread = False
 
 def get_current_time():
     """Return Current Time in MS."""
@@ -156,7 +146,7 @@ class ResumableMicrophoneStream:
             yield b''.join(data)
 
 
-def listen_print_loop(responses, stream):
+def listen_print_loop(responses, stream, socket):
     """Iterates through server responses and prints them.
     The responses passed is a generator that will block until a response
     is provided by the server.
@@ -168,9 +158,7 @@ def listen_print_loop(responses, stream):
     the next result to overwrite it, until the response is a final one. For the
     final one, print a newline to preserve the finalized transcription.
     """
-
     for response in responses:
-
         if get_current_time() - stream.start_time > STREAMING_LIMIT:
             stream.start_time = get_current_time()
             break
@@ -203,22 +191,12 @@ def listen_print_loop(responses, stream):
         # line, so subsequent lines will overwrite them.
 
         if result.is_final:
-
             sys.stdout.write(GREEN)
             sys.stdout.write('\033[K')
             sys.stdout.write(str(corrected_time) + ': ' + transcript + '\n')
-
+            socket.send_string('1' + transcript)
             stream.is_final_end_time = stream.result_end_time
             stream.last_transcript_was_final = True
-
-            # Exit recognition if any of the transcribed phrases could be
-            # one of our keywords.
-            if re.search(r'\b(exit|quit)\b', transcript, re.I):
-                sys.stdout.write(YELLOW)
-                sys.stdout.write('Exiting...\n')
-                stream.closed = True
-                break
-
         else:
             sys.stdout.write(RED)
             sys.stdout.write('\033[K')
@@ -226,9 +204,12 @@ def listen_print_loop(responses, stream):
 
             stream.last_transcript_was_final = False
 
-
 def main():
     """start bidirectional streaming from microphone input to speech API"""
+
+    context = zmq.Context()
+    socket = context.socket(zmq.PUB)
+    socket.bind("tcp://127.0.0.1:5006")
 
     client = speech.SpeechClient()
     config = speech.types.RecognitionConfig(
@@ -243,7 +224,6 @@ def main():
     mic_manager = ResumableMicrophoneStream(SAMPLE_RATE, CHUNK_SIZE)
     print(mic_manager.chunk_size)
     sys.stdout.write(YELLOW)
-    sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
     sys.stdout.write('End (ms)       Transcript Results/Status\n')
     sys.stdout.write('=====================================================\n')
 
@@ -259,12 +239,10 @@ def main():
 
             requests = (speech.types.StreamingRecognizeRequest(
                 audio_content=content)for content in audio_generator)
-
             responses = client.streaming_recognize(streaming_config,
                                                    requests)
-
             # Now, put the transcription responses to use.
-            listen_print_loop(responses, stream)
+            listen_print_loop(responses, stream, socket)
 
             if stream.result_end_time > 0:
                 stream.final_request_end_time = stream.is_final_end_time
@@ -282,5 +260,3 @@ def main():
 if __name__ == '__main__':
 
     main()
-
-# [END speech_transcribe_infinite_streaming]

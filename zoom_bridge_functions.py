@@ -7,8 +7,8 @@ def get_zoom_coords():
     coords = (0, 0)
     def callback(hwnd, extra):
         rect = win32gui.GetWindowRect(hwnd)
-        x = rect[0] + 10
-        y = rect[1] + 10
+        x = rect[0] + 100
+        y = rect[1] + 50
         if 'Zoom Meeting' in win32gui.GetWindowText(hwnd):
             nonlocal coords 
             coords = (x, y)
@@ -92,3 +92,9 @@ def is_chat_open():
         return True
     else:
         return False
+
+def open_then_send_in_chat(message):
+    focus_zoom()
+    send_keys('%H')
+    new_message = message.replace(' ', '{SPACE}')
+    send_keys(new_message + '{ENTER}')
