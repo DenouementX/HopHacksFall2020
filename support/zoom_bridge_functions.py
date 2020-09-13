@@ -2,9 +2,12 @@ from pywinauto import Desktop
 from pywinauto.mouse import click
 from pywinauto.keyboard import send_keys
 import win32gui
+import threading
 import time
 import socket
 import re
+import gesture_server
+from Globals import global_vars
 
 
 def get_zoom_coords():
@@ -62,6 +65,13 @@ def send_reaction(gesture):
     reactions_panel[gesture].click()
 
 
+buttons = ['Clap', 'Thumbs Up', 'Heart', 'Joy', 'Open Mouth', 'Tada']
+
+
+def send_reaction_wrap(gesture_id):
+    send_reaction(buttons[gesture_id])
+
+
 # unmuted is True, muted is False
 def mic_state(getState):
     meeting_tools = get_meeting_tools()
@@ -111,13 +121,13 @@ def is_chat_open():
         return False
 
 
-buttons = ['Clap', 'Thumbs Up', 'Heart', 'Joy', 'Open Mouth', 'Tada']
-gesture_assignments = [0, 1, 2, 3, 4, 5]
-do_react = True
-do_transcribe = False
+
 
 if __name__ == '__main__':
     time.sleep(1)
+
+    if global_vars.do_react:
+        threading.Thread(target=gesture_server.gesture_function).start()
 
     TCP_IP = '127.0.0.1'
     TCP_PORT = 5005
@@ -134,17 +144,24 @@ if __name__ == '__main__':
         if not data:
             break
         data_string = data.decode("utf-8")
-        print("received data:", data_string)
         data_list = re.split(":\\s*|\\r\\n", data_string)
-        print(data_list)
-        print(data_list[1] == '1')
-        if data_list[0] == 'react' and do_react is True:
-            send_reaction(buttons[gesture_assignments[int(data_list[1])]])
+        print("received data:", data_list)
+        global_vars.acquire()
+        print("inside lock from bridge!")
+        if data_list[0] == 'react' and global_vars.do_react is True:
+            send_reaction_wrap(global_vars.gesture_assignments[int(data_list[1])])
         elif data_list[0] == 'assign':
-            gesture_assignments[int(data_list[1])] = int(data_list[2])
+            global_vars.gesture_assignments[int(data_list[1])] = int(data_list[2])
+            print(global_vars.gesture_assignments)
         elif data_list[0] == 'do_react':
-            do_react = data_list[1] == '1'
+            old_do_react = global_vars.do_react
+            global_vars.do_react = data_list[1] == '1'
+            if not old_do_react and global_vars.do_react:
+                threading.Thread(target=gesture_server.gesture_function).start()
         elif data_list[0] == 'do_transcribe':
-            do_transcribe = data_list[1] == '1'
+            global_vars.do_transcribe = data_list[1] == '1'
+        global_vars.release()
+        print("outside lock from bridge!")
         conn.send(data)
+        time.sleep(0.01)
     conn.close()

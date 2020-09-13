@@ -9,6 +9,7 @@
       <sourceFolder url="file://$MODULE_DIR$/recognition" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/template powershell scripts" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/support" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/globals" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/javaTCPTest" />
     </content>
     <orderEntry type="inheritedJdk" />

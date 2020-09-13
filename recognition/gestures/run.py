@@ -12,7 +12,7 @@ CONNECTION_COLOR = (255, 0, 0)
 THICKNESS = 2
 
 cv2.namedWindow(WINDOW)
-capture = cv2.VideoCapture(0)
+capture = cv2.VideoCapture(1)
 
 if capture.isOpened():
     hasFrame, frame = capture.read()
