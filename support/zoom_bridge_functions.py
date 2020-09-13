@@ -4,6 +4,7 @@ from pywinauto.keyboard import send_keys
 import win32gui
 import time
 import socket
+import re
 
 
 def get_zoom_coords():
@@ -112,6 +113,8 @@ def is_chat_open():
 
 buttons = ['Clap', 'Thumbs Up', 'Heart', 'Joy', 'Open Mouth', 'Tada']
 gesture_assignments = [0, 1, 2, 3, 4, 5]
+do_react = True
+do_transcribe = False
 
 if __name__ == '__main__':
     time.sleep(1)
@@ -128,7 +131,20 @@ if __name__ == '__main__':
     print('Connection address:', addr)
     while 1:
         data = conn.recv(BUFFER_SIZE)
-        if not data: break
-        print("received data:", data)
-        send_reaction(buttons[gesture_assignments[int(data)]])
+        if not data:
+            break
+        data_string = data.decode("utf-8")
+        print("received data:", data_string)
+        data_list = re.split(":\\s*|\\r\\n", data_string)
+        print(data_list)
+        print(data_list[1] == '1')
+        if data_list[0] == 'react' and do_react is True:
+            send_reaction(buttons[gesture_assignments[int(data_list[1])]])
+        elif data_list[0] == 'assign':
+            gesture_assignments[int(data_list[1])] = int(data_list[2])
+        elif data_list[0] == 'do_react':
+            do_react = data_list[1] == '1'
+        elif data_list[0] == 'do_transcribe':
+            do_transcribe = data_list[1] == '1'
+        conn.send(data)
     conn.close()
