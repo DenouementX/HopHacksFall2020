@@ -26,18 +26,21 @@ socket2.connect("tcp://127.0.0.1:6007")
 socket.setsockopt_string(zmq.SUBSCRIBE, "")
 socket2.setsockopt_string(zmq.SUBSCRIBE, "")
 
+socket.setsockopt(zmq.RCVHWM , 1)
+socket2.setsockopt(zmq.RCVHWM , 1)
+
 prev_gesture = ""
 consecutive_count = 0
 looking_for_text = False
 
 def gesture():
-    evts2 = poller2.poll(200)
+    evts2 = poller2.poll(400)
     if evts2:
         return socket2.recv_string()
     return '0'
 
 def speech():
-    evts = poller.poll(200)
+    evts = poller.poll(400)
     if evts:
         return socket.recv_string()
     return '1'
