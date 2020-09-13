@@ -25,8 +25,9 @@ Example usage:
 # [START speech_transcribe_infinite_streaming]
 
 import re
-import sys
 import time
+import zoom_bridge_functions
+from Globals import global_vars
 
 from google.cloud import speech
 import pyaudio
@@ -168,12 +169,17 @@ def listen_print_loop(responses, stream):
     the next result to overwrite it, until the response is a final one. For the
     final one, print a newline to preserve the finalized transcription.
     """
+    transcript = ''
 
     for response in responses:
 
-        if get_current_time() - stream.start_time > STREAMING_LIMIT:
+        global_vars.acquire()
+        if not global_vars.do_transcribe or get_current_time() - stream.start_time > STREAMING_LIMIT:
+            global_vars.release()
+            zoom_bridge_functions.send_in_chat(transcript)
             stream.start_time = get_current_time()
             break
+        global_vars.release()
 
         if not response.results:
             continue
@@ -204,25 +210,26 @@ def listen_print_loop(responses, stream):
 
         if result.is_final:
 
-            sys.stdout.write(GREEN)
-            sys.stdout.write('\033[K')
-            sys.stdout.write(str(corrected_time) + ': ' + transcript + '\n')
-
             stream.is_final_end_time = stream.result_end_time
             stream.last_transcript_was_final = True
+
+            global_vars.acquire()
+            print("inside lock from speech!")
+            if global_vars.do_type_transcribe:
+                print("To type in chat: ", transcript)
+                zoom_bridge_functions.send_in_chat(transcript)
+            global_vars.release()
+            print("outside lock from speech!")
 
             # Exit recognition if any of the transcribed phrases could be
             # one of our keywords.
             if re.search(r'\b(exit|quit)\b', transcript, re.I):
-                sys.stdout.write(YELLOW)
-                sys.stdout.write('Exiting...\n')
                 stream.closed = True
+                print("Quit!")
                 break
+            transcript = ''
 
         else:
-            sys.stdout.write(RED)
-            sys.stdout.write('\033[K')
-            sys.stdout.write(str(corrected_time) + ': ' + transcript + '\r')
 
             stream.last_transcript_was_final = False
 
@@ -231,6 +238,7 @@ def main():
     """start bidirectional streaming from microphone input to speech API"""
 
     client = speech.SpeechClient()
+    print("got client!")
     config = speech.types.RecognitionConfig(
         encoding=speech.enums.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=SAMPLE_RATE,
@@ -241,42 +249,21 @@ def main():
         interim_results=True)
 
     mic_manager = ResumableMicrophoneStream(SAMPLE_RATE, CHUNK_SIZE)
-    print(mic_manager.chunk_size)
-    sys.stdout.write(YELLOW)
-    sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
-    sys.stdout.write('End (ms)       Transcript Results/Status\n')
-    sys.stdout.write('=====================================================\n')
-
+    print("got mic!")
     with mic_manager as stream:
 
-        while not stream.closed:
-            sys.stdout.write(YELLOW)
-            sys.stdout.write('\n' + str(
-                STREAMING_LIMIT * stream.restart_counter) + ': NEW REQUEST\n')
+        stream.audio_input = []
+        audio_generator = stream.generator()
 
-            stream.audio_input = []
-            audio_generator = stream.generator()
+        requests = (speech.types.StreamingRecognizeRequest(
+            audio_content=content)for content in audio_generator)
 
-            requests = (speech.types.StreamingRecognizeRequest(
-                audio_content=content)for content in audio_generator)
+        responses = client.streaming_recognize(streaming_config,
+                                               requests)
 
-            responses = client.streaming_recognize(streaming_config,
-                                                   requests)
-
-            # Now, put the transcription responses to use.
-            listen_print_loop(responses, stream)
-
-            if stream.result_end_time > 0:
-                stream.final_request_end_time = stream.is_final_end_time
-            stream.result_end_time = 0
-            stream.last_audio_input = []
-            stream.last_audio_input = stream.audio_input
-            stream.audio_input = []
-            stream.restart_counter = stream.restart_counter + 1
-
-            if not stream.last_transcript_was_final:
-                sys.stdout.write('\n')
-            stream.new_stream = True
+        print("connected and listening!")
+        # Now, put the transcription responses to use.
+        listen_print_loop(responses, stream)
 
 
 if __name__ == '__main__':

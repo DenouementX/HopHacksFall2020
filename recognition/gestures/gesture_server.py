@@ -1,7 +1,7 @@
 import cv2
 from src.hand_tracker import HandTracker
 import math
-from zoom_bridge_functions import send_reaction_wrap
+import zoom_bridge_functions
 from Globals import global_vars
 import pywinauto
 import time
@@ -65,7 +65,9 @@ def gesture_function():
         return distance < 0.1
 
     gesture = [0 for i in range(9)]
+    global_vars.acquire()
     while hasFrame and global_vars.do_react:
+        global_vars.release()
 
         thumbIsOpen = False
         firstFingerIsOpen = False
@@ -135,16 +137,20 @@ def gesture_function():
             if any([i >= 3 for i in gesture]):
                 cur_gesture = gesture.index(3)
                 print("Detected gesture: ", cur_gesture)
-                if cur_gesture < 6:
+                global_vars.acquire()
+                # print("inside lock from gesture!")
+                cur_action = global_vars.gesture_assignments[cur_gesture]
+                if cur_action != 7:
                     try:
-                        global_vars.acquire()
-                        print("inside lock from gesture!")
-                        print(global_vars.gesture_assignments)
-                        send_reaction_wrap(global_vars.gesture_assignments[cur_gesture])
-                        global_vars.release()
-                        print("outside lock from gesture!")
+                        # print(global_vars.gesture_assignments)
+                        zoom_bridge_functions.zoom_function_wrap(cur_action)
                     except (pywinauto.findwindows.ElementNotFoundError, pywinauto.findbestmatch.MatchError, AttributeError, RuntimeError) as e:
                         print(e.args)
+                else:
+                    global_vars.do_live_transcribe = not global_vars.do_live_transcribe
+
+                global_vars.release()
+                # print("outside lock from gesture!")
                 gesture = [0 for i in range(9)]
 
         # cv2.imshow(WINDOW, frame)
@@ -153,6 +159,11 @@ def gesture_function():
         if key == 27:
             break
         time.sleep(0.01)
+        global_vars.acquire()
 
     capture.release()
     cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    gesture_function()
