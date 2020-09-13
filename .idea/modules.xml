@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/HopHacksFall2020.iml" filepath="$PROJECT_DIR$/.idea/HopHacksFall2020.iml" />
+      <module fileurl="file://$PROJECT_DIR$/javaTCPTest/javaTCPTest.iml" filepath="$PROJECT_DIR$/javaTCPTest/javaTCPTest.iml" />
     </modules>
   </component>
 </project>
